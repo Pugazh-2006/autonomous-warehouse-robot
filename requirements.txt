@@ -1,0 +1,6 @@
+# Autonomous Warehouse Robot Dependencies
+# Note: tkinter is bundled with standard Python distributions on Windows and macOS.
+# On Debian/Ubuntu Linux systems, install tkinter via: sudo apt-get install python3-tk
+
+networkx>=3.0
+matplotlib>=3.7.0
