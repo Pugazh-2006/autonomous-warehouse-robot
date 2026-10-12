@@ -4,8 +4,6 @@ An educational and professional desktop application demonstrating how an autonom
 
 ![Autonomous Warehouse Robot Demonstration](autonomous_warehouse_robot_demo.gif)
 
-> 🎥 **HD Demonstration Video**: Available in 720p 24fps MP4 format: [`autonomous_warehouse_robot_demo.mp4`](autonomous_warehouse_robot_demo.mp4) (Generated via automated headless compositor `build_video.py`).
-
 ---
 
 ## 1. Project Overview
@@ -234,7 +232,6 @@ Pugazh-Project-FOAI/
 ├── requirements.txt           # Project dependencies (networkx, matplotlib)
 ├── screenshot_gui.png         # High-resolution screenshot of the multi-map interface
 ├── build_video.py             # Headless high-definition video & GIF compositor
-├── autonomous_warehouse_robot_demo.mp4  # 720p 24fps demonstration video
 ├── autonomous_warehouse_robot_demo.gif  # High-quality animated demo preview
 ├── README.md                  # Comprehensive AI documentation and user guide
 │
