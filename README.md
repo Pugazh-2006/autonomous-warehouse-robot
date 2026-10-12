@@ -66,10 +66,12 @@ The user interface is structured into three clean, dedicated functional panels:
 - **Scrollable Pathway List**: Complete list of corridors with checkboxes and instant `OPEN`/`BLOCKED` badges, plus **Unblock All**.
 
 ### Center Panel: Interactive Warehouse Canvas
-- **Top Toolbar**: Displays current map name, node count, edge count, plus **Reset View**, **Zoom In (+)**, and **Zoom Out (-)** controls.
+- **Top Toolbar**: Displays current map name, node count, edge count, zoom status, and **Fit View**, **Zoom In (+)**, and **Zoom Out (-)** controls.
 - **Dynamic Scaling Visualizer**: Automatically computes map bounding boxes, adapts node radii and font sizes, and draws navigation arrows along the robot path.
 - **Edge Click-to-Block**: Clicking any corridor line on the canvas toggles its blocked/open status directly.
 - **Node Click-to-Inspect**: Clicking any node highlights it on the canvas and loads full metadata into the Inspector card.
+- **Map Navigation**: Use the mouse wheel or toolbar buttons to zoom. Hold the middle mouse button and drag to pan; the hand cursor indicates active panning. **Fit View** restores the complete map, and the dashed viewport boundary shows the safe zoom area.
+- **Theme Control**: Switch between the dark glass theme and light mode from the header.
 - **Visual Legend**: Clear guide explaining node roles (Source, Destination, Route, Visited) and pathway styles (Open, Route, Blocked).
 
 ### Right Panel: Results & Inspector
@@ -78,6 +80,14 @@ The user interface is structured into three clean, dedicated functional panels:
 - **Robot Navigation Path**: Multi-line arrow trajectory (`Storage Area ↓ Rack A ↓ Packing Station`).
 - **Visited Sequence Tab**: Scrollable table showing the exact chronological expansion sequence with step numbers, location labels, facility types, and final path status.
 - **AI Theory Guide Tab**: In-depth educational reference explaining graph traversal fundamentals.
+
+### Quick Client Interaction Flow
+1. **Select a layout** from the map selector, or enter a seed and generate a reproducible random warehouse.
+2. **Choose the request** by selecting the robot source location and destination location.
+3. **Choose BFS or DFS**, then click **Run Navigation** to calculate the route and display the metrics.
+4. **Start Animation** to watch node exploration and route reconstruction step by step. Pause, resume, or adjust the speed when presenting the search process.
+5. **Simulate an obstacle** by checking a pathway in the blockage list or clicking a corridor on the map, then run navigation again to show automatic rerouting.
+6. **Inspect the result** in the right panel, including the named route, visited sequence, path length, search time, and shortest-path guarantee.
 
 ---
 
