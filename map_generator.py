@@ -103,6 +103,12 @@ class RandomMapGenerator:
 
         min_c = min(pt[0] for pt in sorted_coords)
         max_c = max(pt[0] for pt in sorted_coords)
+        column_x = {}
+        current_x = 1.0
+        for c in range(cols):
+            column_x[c] = current_x
+            current_x += rng.uniform(1.05, 1.45)
+        row_y = {r: 0.9 + r * 1.15 + rng.uniform(-0.12, 0.12) for r in range(rows)}
 
         storage_count = 0
         rack_count = 0
@@ -112,8 +118,8 @@ class RandomMapGenerator:
         charging_count = 0
 
         for i, (c, r) in enumerate(sorted_coords, start=1):
-            x = round(1.0 + c * 1.3, 2)
-            y = round(1.0 + r * 1.3, 2)
+            x = round(column_x[c] + rng.uniform(-0.10, 0.10), 2)
+            y = round(row_y[r] + rng.uniform(-0.08, 0.08), 2)
 
             # Determine facility type based on warehouse logistics zones
             if c == min_c:
@@ -149,7 +155,11 @@ class RandomMapGenerator:
                 ntype = "Rack"
 
             coord_to_id[(c, r)] = node_id
-            nodes[node_id] = {"label": label, "type": ntype}
+            nodes[node_id] = {
+                "label": label,
+                "type": ntype,
+                "short_label": label.replace("Storage ", "").replace("Inbound ", ""),
+            }
             positions[node_id] = (x, y)
 
         # Build grid-aligned pathways
@@ -165,6 +175,13 @@ class RandomMapGenerator:
             if (c, r + 1) in coord_to_id:
                 v_id = coord_to_id[(c, r + 1)]
                 edges_set.add(canonical_edge(u_id, v_id))
+
+            # Add occasional express links so generated maps do not all look
+            # like the same plain lattice while keeping the warehouse geometry.
+            if (c + 2, r) in coord_to_id and rng.random() < 0.22:
+                edges_set.add(canonical_edge(u_id, coord_to_id[(c + 2, r)]))
+            if (c, r + 2) in coord_to_id and rng.random() < 0.12:
+                edges_set.add(canonical_edge(u_id, coord_to_id[(c, r + 2)]))
 
         # Build temporary NetworkX graph to guarantee connectivity
         G = nx.Graph()

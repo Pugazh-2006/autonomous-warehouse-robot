@@ -7,6 +7,7 @@ Cross-Aisle 18 nodes, Medium 28 nodes, Large 50 nodes).
 
 from __future__ import annotations
 from dataclasses import dataclass, field
+import random
 from typing import Dict, List, Optional, Tuple
 
 
@@ -235,126 +236,126 @@ def _build_cross_aisle_map() -> WarehouseMap:
     )
 
 
-def _build_medium_map() -> WarehouseMap:
-    """Build the 28-node Medium Warehouse layout (7 columns x 4 rows)."""
-    cols = 7
-    rows = 4
+def _build_aisle_map(
+    key: str,
+    name: str,
+    node_prefix: str,
+    cols: int,
+    rows: int,
+    seed: int,
+    description: str,
+    default_source: str,
+    default_destination: str,
+) -> WarehouseMap:
+    """Build a connected warehouse with staggered aisles and varied corridors.
+
+    The previous implementation rendered medium and large maps as perfect grids.
+    This keeps the useful aisle structure while adding stable variation to aisle
+    spacing, node positions, and cross-corridor connections.
+    """
+    rng = random.Random(seed)
     nodes: Dict[str, Dict[str, str]] = {}
     positions: Dict[str, Tuple[float, float]] = {}
     edges: List[Tuple[str, str]] = []
 
-    # Coordinate grid: x from 1.0 to 8.5, y from 1.0 to 4.5
+    x_values: List[float] = []
+    x = 1.0
+    for _ in range(cols):
+        x_values.append(round(x, 2))
+        x += rng.uniform(1.05, 1.45)
+
+    y_values = [round(0.9 + row * 1.05 + rng.uniform(-0.12, 0.12), 2) for row in range(rows)]
+    column_wave = {c: rng.uniform(-0.28, 0.28) for c in range(cols)}
+    cross_rows = {0, rows // 2, rows - 1}
+
     for c in range(cols):
         for r in range(rows):
-            node_id = f"M{c}{r}"
-            x = 1.0 + c * 1.25
-            y = 1.0 + r * 1.15
-            positions[node_id] = (round(x, 2), round(y, 2))
+            node_id = f"{node_prefix}{c}{r}"
+            x_pos = x_values[c] + rng.uniform(-0.10, 0.10)
+            y_pos = y_values[r] + column_wave[c] + rng.uniform(-0.08, 0.08)
+            positions[node_id] = (round(x_pos, 2), round(y_pos, 2))
 
-            # Facility type assignment
             if c == 0:
-                if r in (1, 2):
-                    label, ntype = f"Inbound Dock {r}", "Storage"
-                else:
-                    label, ntype = f"West Staging {r}", "Storage"
+                label = f"Inbound Dock {r + 1}"
+                ntype = "Storage"
             elif c == cols - 1:
-                if r == 3:
-                    label, ntype = "Fast Charge Bay", "Charging Station"
-                elif r in (1, 2):
-                    label, ntype = f"Packing Station {r}", "Packing Station"
+                if r == rows - 1:
+                    label, ntype = "Charging Hub", "Charging Station"
+                elif r in (rows // 2, max(1, rows // 2 - 1)):
+                    label, ntype = f"Packing Hub {r + 1}", "Packing Station"
                 else:
-                    label, ntype = "Dispatch Exit", "Exit"
-            elif r in (0, 3):
-                label, ntype = f"Mainway Junction {c}-{r}", "Intersection"
+                    label, ntype = f"Dispatch Gate {r + 1}", "Exit"
+            elif r in cross_rows:
+                label, ntype = f"Cross Aisle {c + 1}-{r + 1}", "Intersection"
             else:
-                label, ntype = f"Rack Bay {c}-{r}", "Rack"
+                zone = chr(64 + ((c - 1) % 6) + 1)
+                label, ntype = f"Rack Zone {zone}{r}", "Rack"
 
-            nodes[node_id] = {"label": label, "type": ntype}
+            nodes[node_id] = {
+                "label": label,
+                "type": ntype,
+                "short_label": label.replace("Storage ", "").replace("Inbound ", ""),
+            }
 
-    # Grid edges with cross corridors
+    def add_edge(u: str, v: str) -> None:
+        edge = tuple(sorted((u, v)))
+        if edge not in edges:
+            edges.append(edge)
+
+    # Every aisle remains vertically connected.
     for c in range(cols):
-        for r in range(rows):
-            u = f"M{c}{r}"
-            # Horizontal right
-            if c < cols - 1:
-                v = f"M{c+1}{r}"
-                edges.append((u, v))
-            # Vertical up
-            if r < rows - 1:
-                v = f"M{c}{r+1}"
-                edges.append((u, v))
+        for r in range(rows - 1):
+            add_edge(f"{node_prefix}{c}{r}", f"{node_prefix}{c}{r + 1}")
+
+    # Three main cross aisles plus a few varied secondary links.
+    for r in sorted(cross_rows):
+        for c in range(cols - 1):
+            add_edge(f"{node_prefix}{c}{r}", f"{node_prefix}{c + 1}{r}")
+    for r in range(rows):
+        if r in cross_rows:
+            continue
+        for c in range(cols - 1):
+            if rng.random() < 0.42:
+                add_edge(f"{node_prefix}{c}{r}", f"{node_prefix}{c + 1}{r}")
 
     return WarehouseMap(
-        key="medium",
-        name="Medium Warehouse",
-        node_count_label="28 nodes",
-        description="Multi-corridor logistics facility with 4 rack zones, perimeter highways, and dual dispatch.",
+        key=key,
+        name=name,
+        node_count_label=f"{cols * rows} nodes",
+        description=description,
         nodes=nodes,
         edges=edges,
         positions=positions,
+        default_source=default_source,
+        default_destination=default_destination,
+    )
+
+
+def _build_medium_map() -> WarehouseMap:
+    """Build a 28-node staggered multi-aisle warehouse."""
+    return _build_aisle_map(
+        key="medium",
+        name="Medium Warehouse",
+        node_prefix="M",
+        cols=7,
+        rows=4,
+        seed=731,
+        description="Staggered multi-aisle facility with rack zones, cross aisles, charging, and dual dispatch.",
         default_source="M02",
         default_destination="M61",
     )
 
 
 def _build_large_map() -> WarehouseMap:
-    """Build the 50-node Large Warehouse layout (10 columns x 5 rows)."""
-    cols = 10
-    rows = 5
-    nodes: Dict[str, Dict[str, str]] = {}
-    positions: Dict[str, Tuple[float, float]] = {}
-    edges: List[Tuple[str, str]] = []
-
-    for c in range(cols):
-        for r in range(rows):
-            node_id = f"N{c}{r}"
-            x = 1.0 + c * 1.0
-            y = 1.0 + r * 1.0
-            positions[node_id] = (round(x, 2), round(y, 2))
-
-            if c == 0:
-                if r in (1, 2, 3):
-                    label, ntype = f"Inbound Gate {r}", "Storage"
-                else:
-                    label, ntype = f"Storage Bay {r}", "Storage"
-            elif c == cols - 1:
-                if r == 4:
-                    label, ntype = "Automated Charging Hub", "Charging Station"
-                elif r in (2, 3):
-                    label, ntype = f"Packing Hub {r}", "Packing Station"
-                elif r == 1:
-                    label, ntype = "Heavy Freight Dispatch", "Exit"
-                else:
-                    label, ntype = "Express Outbound Dock", "Exit"
-            elif r in (0, 2, 4):
-                # Cross aisles at top, middle, and bottom
-                label, ntype = f"Crossway J{c}-{r}", "Intersection"
-            else:
-                label, ntype = f"Storage Rack C{c}R{r}", "Rack"
-
-            nodes[node_id] = {"label": label, "type": ntype}
-
-    # Grid pathways
-    for c in range(cols):
-        for r in range(rows):
-            u = f"N{c}{r}"
-            # Horizontal connection
-            if c < cols - 1:
-                v = f"N{c+1}{r}"
-                edges.append((u, v))
-            # Vertical connection along aisles & crossways
-            if r < rows - 1:
-                v = f"N{c}{r+1}"
-                edges.append((u, v))
-
-    return WarehouseMap(
+    """Build a 50-node large warehouse with varied aisle geometry."""
+    return _build_aisle_map(
         key="large",
         name="Large Warehouse",
-        node_count_label="50 nodes",
-        description="Automated fulfillment megahub with 10 aisles, 3 cross-aisle highways, and multiple work cells.",
-        nodes=nodes,
-        edges=edges,
-        positions=positions,
+        node_prefix="N",
+        cols=10,
+        rows=5,
+        seed=1947,
+        description="Fulfillment megahub with staggered rack aisles, cross-aisle highways, and operational work cells.",
         default_source="N02",
         default_destination="N92",
     )

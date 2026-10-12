@@ -2,6 +2,10 @@
 
 An educational and professional desktop application demonstrating how an autonomous mobile warehouse robot uses graph traversal and uninformed search algorithms—**Breadth First Search (BFS)** and **Depth First Search (DFS)**—to navigate through realistic multi-aisle warehouse layouts, avoid dynamic corridor blockages, and find optimal routes.
 
+![Autonomous Warehouse Robot Demonstration](autonomous_warehouse_robot_demo.gif)
+
+> 🎥 **HD Demonstration Video**: Available in 720p 24fps MP4 format: [`autonomous_warehouse_robot_demo.mp4`](autonomous_warehouse_robot_demo.mp4) (Generated via automated headless compositor `build_video.py`).
+
 ---
 
 ## 1. Project Overview
@@ -229,6 +233,9 @@ Pugazh-Project-FOAI/
 ├── visualization.py           # Matplotlib visualizer with dynamic scaling & zoom/pan controls
 ├── requirements.txt           # Project dependencies (networkx, matplotlib)
 ├── screenshot_gui.png         # High-resolution screenshot of the multi-map interface
+├── build_video.py             # Headless high-definition video & GIF compositor
+├── autonomous_warehouse_robot_demo.mp4  # 720p 24fps demonstration video
+├── autonomous_warehouse_robot_demo.gif  # High-quality animated demo preview
 ├── README.md                  # Comprehensive AI documentation and user guide
 │
 └── tests/

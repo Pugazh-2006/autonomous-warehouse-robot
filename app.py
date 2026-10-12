@@ -35,8 +35,11 @@ class AutonomousWarehouseApp:
         """Initialize the application, map manager, UI components, and state."""
         self.root = root
         self.root.title("Autonomous Warehouse Robot - Multi-Map Navigation Simulator")
-        self.root.geometry("1380x900")
-        self.root.minsize(1120, 740)
+        self.root.geometry("1480x940")
+        self.root.minsize(1240, 780)
+        self.dark_mode: bool = True
+        self.palette = self._get_palette()
+        self.root.configure(bg=self.palette["bg"])
 
         # Core data models
         self.map_manager = MapManager()
@@ -64,72 +67,210 @@ class AutonomousWarehouseApp:
 
         # Initial map load
         self.load_selected_map("starter")
+        self._apply_theme()
+
+    def _get_palette(self) -> Dict[str, str]:
+        """Return the current glass-card UI palette."""
+        if self.dark_mode:
+            return {
+                "bg": "#09111f",
+                "panel": "#0e1a2b",
+                "card": "#14243a",
+                "card_alt": "#192b45",
+                "input": "#0b1728",
+                "border": "#2b4566",
+                "text": "#e8f0fb",
+                "muted": "#95a9c2",
+                "header": "#060d19",
+                "accent": "#4f8cff",
+                "accent_hover": "#6ca0ff",
+                "teal": "#20c7b1",
+                "teal_hover": "#39e0c9",
+                "danger": "#ef6b82",
+                "warning": "#f0b35b",
+                "disabled": "#30435d",
+                "disabled_text": "#7890ad",
+                "badge": "#193653",
+                "success_badge": "#123e3a",
+                "warning_badge": "#4a351a",
+                "error_badge": "#4b202b",
+                "status": "#071425",
+            }
+        return {
+            "bg": "#eef3f8",
+            "panel": "#f5f8fc",
+            "card": "#ffffff",
+            "card_alt": "#f8fbff",
+            "input": "#ffffff",
+            "border": "#cbd8e6",
+            "text": "#243447",
+            "muted": "#64748b",
+            "header": "#0f172a",
+            "accent": "#2563eb",
+            "accent_hover": "#1d4ed8",
+            "teal": "#0d9488",
+            "teal_hover": "#0f766e",
+            "danger": "#dc2626",
+            "warning": "#d97706",
+            "disabled": "#d8e0e9",
+            "disabled_text": "#94a3b8",
+            "badge": "#f1f5f9",
+            "success_badge": "#dcfce7",
+            "warning_badge": "#fef3c7",
+            "error_badge": "#fee2e2",
+            "status": "#1e293b",
+        }
 
     def _configure_styles(self) -> None:
-        """Configure modern ttk styles and clean professional palette."""
+        """Configure ttk styles for the current glass-card theme."""
         style = ttk.Style()
+        # Clam honors explicit colors on Windows. Vista replaces custom button
+        # colors with system states, which made the old controls look disabled.
         try:
             style.theme_use("clam")
         except Exception:
             pass
 
-        bg_main = "#f1f5f9"
-        style.configure(".", background=bg_main, font=("Segoe UI", 9))
-        style.configure("Header.TFrame", background="#0f172a")
-        style.configure("TLabelframe", background="#ffffff")
+        p = self.palette
+        style.configure(".", background=p["bg"], foreground=p["text"], font=("Segoe UI", 9))
+        style.configure("TFrame", background=p["bg"])
+        style.configure("TLabel", background=p["bg"], foreground=p["text"])
+        style.configure("Header.TFrame", background=p["header"])
+        style.configure("TLabelframe", background=p["card"], borderwidth=1, relief="solid")
         style.configure(
             "TLabelframe.Label",
-            background="#ffffff",
+            background=p["card"],
             font=("Segoe UI", 9, "bold"),
-            foreground="#1e293b",
+            foreground=p["text"],
         )
+        style.configure("TNotebook", background=p["bg"], borderwidth=0)
+        style.configure("TNotebook.Tab", padding=(10, 6), font=("Segoe UI", 9), background=p["card"], foreground=p["text"])
+        style.map("TNotebook.Tab", background=[("selected", p["card_alt"])], foreground=[("selected", p["accent"])])
+        style.configure("TCombobox", padding=4, fieldbackground=p["input"], background=p["input"], foreground=p["text"])
+        style.map("TCombobox", fieldbackground=[("readonly", p["input"])], foreground=[("readonly", p["text"])])
+        style.configure("TEntry", fieldbackground=p["input"], foreground=p["text"])
+        style.configure("TRadiobutton", background=p["card_alt"], foreground=p["text"])
+        style.configure("TCheckbutton", background=p["card"], foreground=p["text"])
+        style.configure("TScale", background=p["card"], troughcolor=p["input"])
+        style.configure(
+            "Panel.Vertical.TScrollbar",
+            background=p["card_alt"],
+            troughcolor=p["panel"],
+            bordercolor=p["panel"],
+            arrowcolor=p["muted"],
+            width=10,
+        )
+        style.configure("Treeview", rowheight=26, font=("Segoe UI", 9), background=p["input"], fieldbackground=p["input"], foreground=p["text"])
+        style.configure("Treeview.Heading", font=("Segoe UI", 9, "bold"), background=p["card_alt"], foreground=p["text"])
 
         # Button Styles
         style.configure(
             "Primary.TButton",
             font=("Segoe UI", 9, "bold"),
-            background="#2563eb",
+            background=p["accent"],
             foreground="#ffffff",
-            padding=5,
+            padding=(10, 7),
+            borderwidth=0,
         )
         style.map(
             "Primary.TButton",
-            background=[("active", "#1d4ed8"), ("disabled", "#94a3b8")],
-            foreground=[("disabled", "#cbd5e1")],
+            background=[("active", p["accent_hover"]), ("disabled", p["disabled"])],
+            foreground=[("disabled", p["disabled_text"])],
         )
 
         style.configure(
             "Teal.TButton",
             font=("Segoe UI", 9, "bold"),
-            background="#0d9488",
+            background=p["teal"],
             foreground="#ffffff",
-            padding=5,
+            padding=(10, 7),
+            borderwidth=0,
         )
         style.map(
             "Teal.TButton",
-            background=[("active", "#0f766e"), ("disabled", "#94a3b8")],
-            foreground=[("disabled", "#cbd5e1")],
+            background=[("active", p["teal_hover"]), ("disabled", p["disabled"])],
+            foreground=[("disabled", p["disabled_text"])],
         )
 
         style.configure(
             "Outline.TButton",
             font=("Segoe UI", 9),
-            background="#ffffff",
-            foreground="#334155",
-            padding=4,
+            background=p["card_alt"],
+            foreground=p["text"],
+            padding=(8, 6),
+            borderwidth=1,
         )
         style.map(
             "Outline.TButton",
-            background=[("active", "#f1f5f9")],
+            background=[("active", p["input"]), ("disabled", p["disabled"])],
+            foreground=[("disabled", p["disabled_text"])],
         )
 
         style.configure(
             "Mini.TButton",
             font=("Segoe UI", 8),
-            background="#f8fafc",
-            foreground="#475569",
-            padding=2,
+            background=p["card_alt"],
+            foreground=p["text"],
+            padding=(6, 4),
+            borderwidth=1,
         )
+        style.map("Mini.TButton", background=[("active", p["input"])])
+
+    def toggle_theme(self) -> None:
+        """Switch between the dark glass theme and the light theme."""
+        self.dark_mode = not self.dark_mode
+        self.palette = self._get_palette()
+        self._configure_styles()
+        self._apply_theme()
+
+    def _apply_theme(self) -> None:
+        """Apply the current palette to native Tk widgets and the canvas."""
+        p = self.palette
+        self.root.configure(bg=p["bg"])
+        self.header_frame.configure(bg=p["header"])
+        self.title_label.configure(bg=p["header"], fg=p["text"])
+        self.sub_label.configure(bg=p["header"], fg=p["muted"])
+        self.theme_button.configure(
+            text="☀  Light mode" if self.dark_mode else "☾  Dark mode",
+            fg=p["text"],
+            bg=p["card"],
+            activeforeground="#ffffff",
+            activebackground=p["card_alt"],
+        )
+        self.status_frame.configure(bg=p["status"])
+        self.status_icon.configure(bg=p["status"], fg=p["teal"])
+        self.status_label.configure(bg=p["status"], fg=p["text"])
+        self.route_badge.configure(bg=p["badge"], fg=p["text"])
+        self.path_text.configure(bg=p["input"], fg=p["text"], insertbackground=p["text"])
+        self.theory_text.configure(bg=p["input"], fg=p["text"], insertbackground=p["text"])
+        self.left_canvas.configure(bg=p["panel"])
+        self.edge_canvas.configure(bg=p["input"], highlightbackground=p["border"])
+
+        # Explicit ttk foregrounds created by individual widgets are refreshed
+        # as well, so labels do not remain dark on a dark card after toggling.
+        for widget in self._walk_widgets(self.root):
+            if isinstance(widget, ttk.Label):
+                try:
+                    widget.configure(foreground=p["text"])
+                except tk.TclError:
+                    pass
+
+        for widget in (self.map_desc_lbl, self.map_help_lbl, self.zoom_status_lbl,
+                       self.pathway_info_lbl, self.insp_type_lbl, self.insp_degree_lbl):
+            widget.configure(foreground=p["muted"])
+
+        self._refresh_pathway_checkboxes()
+        self.visualizer.set_theme(self.dark_mode)
+        if self.current_result is not None:
+            self.display_results(self.current_result)
+        self._sync_visualization()
+
+    @staticmethod
+    def _walk_widgets(widget):
+        """Yield a widget and all descendants for theme refreshes."""
+        yield widget
+        for child in widget.winfo_children():
+            yield from AutonomousWarehouseApp._walk_widgets(child)
 
     def _build_ui(self) -> None:
         """Construct the entire application window layout using a 3-area architecture."""
@@ -165,34 +306,59 @@ class AutonomousWarehouseApp:
 
     def _build_header(self, parent: ttk.Frame) -> None:
         """Build the top title and subtitle banner."""
-        header_frame = tk.Frame(parent, bg="#0f172a", height=68)
+        p = self.palette
+        header_frame = tk.Frame(parent, bg=p["header"], height=76)
+        self.header_frame = header_frame
         header_frame.pack(fill=tk.X, side=tk.TOP)
 
-        title_label = tk.Label(
+        self.theme_button = tk.Button(
+            header_frame,
+            text="☀  Light mode",
+            command=self.toggle_theme,
+            font=("Segoe UI", 9, "bold"),
+            fg="#e8f0fb",
+            bg="#14243a",
+            activeforeground="#ffffff",
+            activebackground="#243b5b",
+            relief="flat",
+            bd=0,
+            padx=12,
+            pady=7,
+            cursor="hand2",
+        )
+        self.theme_button.pack(side=tk.RIGHT, padx=18, pady=20)
+
+        self.title_label = tk.Label(
             header_frame,
             text="Autonomous Warehouse Robot",
             font=("Segoe UI", 15, "bold"),
-            fg="#f8fafc",
-            bg="#0f172a",
+            fg="#e8f0fb",
+            bg=p["header"],
         )
-        title_label.pack(anchor="w", padx=16, pady=(6, 0))
+        self.title_label.pack(anchor="w", padx=18, pady=(8, 0))
 
-        sub_label = tk.Label(
+        self.sub_label = tk.Label(
             header_frame,
             text="Multi-Map Warehouse Navigation Simulator  •  Breadth First Search (BFS) & Depth First Search (DFS)",
             font=("Segoe UI", 9),
-            fg="#94a3b8",
-            bg="#0f172a",
+            fg="#95a9c2",
+            bg=p["header"],
         )
-        sub_label.pack(anchor="w", padx=16, pady=(1, 6))
+        self.sub_label.pack(anchor="w", padx=18, pady=(1, 8))
 
     # =========================================================================
     # LEFT PANEL: Map Selection, Controls, Animation, Pathways
     # =========================================================================
     def _build_left_panel(self, parent: ttk.Frame) -> None:
         """Construct the scrollable left control panel."""
-        canvas = tk.Canvas(parent, bg="#f1f5f9", highlightthickness=0)
-        scrollbar = ttk.Scrollbar(parent, orient="vertical", command=canvas.yview)
+        canvas = tk.Canvas(parent, bg=self.palette["panel"], highlightthickness=0)
+        self.left_canvas = canvas
+        scrollbar = ttk.Scrollbar(
+            parent,
+            orient="vertical",
+            command=canvas.yview,
+            style="Panel.Vertical.TScrollbar",
+        )
         scroll_content = ttk.Frame(canvas)
 
         scroll_content.bind(
@@ -391,13 +557,20 @@ class AutonomousWarehouseApp:
             font=("Segoe UI", 8),
             foreground="#475569",
         )
+        self.pathway_info_lbl = info_lbl
         info_lbl.pack(anchor="w", pady=(0, 4))
 
         # Scrollable container for checkboxes
         list_container = ttk.Frame(pathway_card, height=180)
         list_container.pack(fill=tk.BOTH, expand=True)
 
-        self.edge_canvas = tk.Canvas(list_container, bg="#ffffff", highlightthickness=1, highlightbackground="#cbd5e1", height=160)
+        self.edge_canvas = tk.Canvas(
+            list_container,
+            bg=self.palette["input"],
+            highlightthickness=1,
+            highlightbackground=self.palette["border"],
+            height=160,
+        )
         edge_scroll = ttk.Scrollbar(list_container, orient="vertical", command=self.edge_canvas.yview)
         self.edge_scroll_content = ttk.Frame(self.edge_canvas)
 
@@ -442,25 +615,47 @@ class AutonomousWarehouseApp:
         center_card = ttk.LabelFrame(parent, text=" Warehouse Floor Topology (Interactive Canvas) ", padding=4)
         center_card.pack(fill=tk.BOTH, expand=True)
 
-        # Top Canvas Info & Zoom Toolbar
+        # Top Canvas Info & Zoom Toolbar. Keep controls on their own row so
+        # long map names and interaction hints cannot squeeze them away.
         top_bar = ttk.Frame(center_card)
         top_bar.pack(fill=tk.X, padx=4, pady=(2, 4))
 
+        toolbar_row = ttk.Frame(top_bar)
+        toolbar_row.pack(fill=tk.X)
+
         self.map_metrics_lbl = ttk.Label(
-            top_bar,
+            toolbar_row,
             text="Map: Starter Map  •  5 Nodes  •  5 Pathways",
             font=("Segoe UI", 9, "bold"),
             foreground="#1e293b",
         )
         self.map_metrics_lbl.pack(side=tk.LEFT)
 
-        # Zoom buttons
-        zoom_box = ttk.Frame(top_bar)
+        # Zoom buttons stay anchored at the right edge of the first row.
+        zoom_box = ttk.Frame(toolbar_row)
         zoom_box.pack(side=tk.RIGHT)
 
-        ttk.Button(zoom_box, text="🔍 Reset", style="Mini.TButton", command=self._on_reset_view).pack(side=tk.LEFT, padx=1)
+        self.zoom_status_lbl = ttk.Label(
+            toolbar_row,
+            text="Zoom 100% · Fit",
+            font=("Segoe UI", 8),
+            foreground="#64748b",
+        )
+        self.zoom_status_lbl.pack(side=tk.RIGHT, padx=(8, 8))
+
+        ttk.Button(zoom_box, text="Fit View", style="Mini.TButton", command=self._on_reset_view).pack(side=tk.LEFT, padx=1)
         ttk.Button(zoom_box, text="＋", width=3, style="Mini.TButton", command=self._on_zoom_in).pack(side=tk.LEFT, padx=1)
         ttk.Button(zoom_box, text="－", width=3, style="Mini.TButton", command=self._on_zoom_out).pack(side=tk.LEFT, padx=1)
+
+        help_row = ttk.Frame(top_bar)
+        help_row.pack(fill=tk.X, pady=(2, 0))
+        self.map_help_lbl = ttk.Label(
+            help_row,
+            text="Click a node for details  ·  Click a corridor to block it  ·  Middle-drag to pan",
+            font=("Segoe UI", 8),
+            foreground="#64748b",
+        )
+        self.map_help_lbl.pack(side=tk.LEFT)
 
         # Matplotlib visualizer
         self.visualizer = WarehouseVisualizer(
@@ -468,6 +663,7 @@ class AutonomousWarehouseApp:
             warehouse=self.warehouse,
             on_edge_toggle_cb=self._on_canvas_edge_clicked,
             on_node_click_cb=self._on_canvas_node_clicked,
+            on_zoom_change_cb=self._on_zoom_changed,
         )
         self.visualizer.get_widget().pack(fill=tk.BOTH, expand=True)
 
@@ -503,8 +699,8 @@ class AutonomousWarehouseApp:
             parent,
             text="No Search Run Yet",
             font=("Segoe UI", 9, "bold"),
-            fg="#475569",
-            bg="#f1f5f9",
+            fg=self.palette["text"],
+            bg=self.palette["badge"],
             pady=5,
         )
         self.route_badge.pack(fill=tk.X, pady=(0, 6))
@@ -569,8 +765,9 @@ class AutonomousWarehouseApp:
             height=6,
             wrap=tk.WORD,
             font=("Consolas", 10),
-            bg="#f8fafc",
-            fg="#0f172a",
+            bg=self.palette["input"],
+            fg=self.palette["text"],
+            insertbackground=self.palette["text"],
             relief="solid",
             bd=1,
         )
@@ -614,7 +811,18 @@ class AutonomousWarehouseApp:
 
     def _build_theory_view(self, parent: ttk.Frame) -> None:
         """Construct the AI Theory explanation view."""
-        txt = tk.Text(parent, font=("Segoe UI", 9), wrap=tk.WORD, bg="#ffffff", fg="#0f172a", relief="flat", padx=8, pady=8)
+        txt = tk.Text(
+            parent,
+            font=("Segoe UI", 9),
+            wrap=tk.WORD,
+            bg=self.palette["input"],
+            fg=self.palette["text"],
+            insertbackground=self.palette["text"],
+            relief="flat",
+            padx=8,
+            pady=8,
+        )
+        self.theory_text = txt
         theory_content = (
             "1. Why Breadth First Search (BFS) Guarantees Optimality\n"
             "----------------------------------------------------------------------\n"
@@ -641,30 +849,30 @@ class AutonomousWarehouseApp:
 
     def _build_status_bar(self, parent: ttk.Frame) -> None:
         """Build bottom status notification bar."""
-        self.status_frame = tk.Frame(parent, bg="#1e293b", height=26)
+        self.status_frame = tk.Frame(parent, bg=self.palette["status"], height=30)
         self.status_frame.pack(fill=tk.X, side=tk.BOTTOM)
 
-        self.status_icon = tk.Label(self.status_frame, text="●", font=("Segoe UI", 9, "bold"), fg="#10b981", bg="#1e293b")
+        self.status_icon = tk.Label(self.status_frame, text="●", font=("Segoe UI", 9, "bold"), fg=self.palette["teal"], bg=self.palette["status"])
         self.status_icon.pack(side=tk.LEFT, padx=(10, 4))
 
         self.status_label = tk.Label(
             self.status_frame,
             text="Ready. Select source, destination, and search algorithm.",
             font=("Segoe UI", 9),
-            fg="#f8fafc",
-            bg="#1e293b",
+            fg=self.palette["text"],
+            bg=self.palette["status"],
         )
         self.status_label.pack(side=tk.LEFT, padx=2)
 
     def update_status(self, message: str, status_type: str = "info") -> None:
         """Update status bar message with colored indicator."""
         color_map = {
-            "info": "#10b981",      # Emerald
-            "warning": "#f59e0b",   # Amber
-            "error": "#ef4444",     # Red
-            "busy": "#3b82f6",      # Blue
+            "info": self.palette["teal"],
+            "warning": self.palette["warning"],
+            "error": self.palette["danger"],
+            "busy": self.palette["accent"],
         }
-        self.status_icon.config(fg=color_map.get(status_type, "#10b981"))
+        self.status_icon.config(fg=color_map.get(status_type, self.palette["teal"]))
         self.status_label.config(text=message)
 
     # =========================================================================
@@ -679,6 +887,10 @@ class AutonomousWarehouseApp:
         self._cancel_animation_if_running()
         self.map_manager.set_current_map(map_key)
         self.warehouse.load_map(target_map)
+        if hasattr(self, "visualizer"):
+            # Every map gets a fresh fit. The old zoom was the reason large
+            # maps could remain cropped after switching layouts.
+            self.visualizer.zoom_factor = 1.0
 
         # Update description & banner
         self.map_desc_lbl.config(text=target_map.description)
@@ -776,14 +988,14 @@ class AutonomousWarehouseApp:
             cb.pack(side=tk.LEFT, anchor="w")
 
             status_text = "BLOCKED" if is_blocked else "OPEN"
-            status_color = "#dc2626" if is_blocked else "#059669"
+            status_color = self.palette["danger"] if is_blocked else self.palette["teal"]
 
             tag = tk.Label(
                 row,
                 text=status_text,
                 font=("Segoe UI", 8, "bold"),
                 fg=status_color,
-                bg="#ffffff",
+                bg=self.palette["input"],
                 padx=3,
                 pady=1,
             )
@@ -826,6 +1038,18 @@ class AutonomousWarehouseApp:
     def _on_reset_view(self) -> None:
         """Reset canvas zoom to fit."""
         self.visualizer.reset_view()
+
+    def _on_zoom_changed(self, zoom_factor: float) -> None:
+        """Keep the toolbar honest about the current viewport and limits."""
+        if zoom_factor <= WarehouseVisualizer.MIN_ZOOM_FACTOR + 0.001:
+            text = "Zoom 125% · Limit"
+        elif zoom_factor >= WarehouseVisualizer.MAX_ZOOM_FACTOR - 0.001:
+            text = "Zoom 56% · Wide view"
+        elif abs(zoom_factor - 1.0) < 0.01:
+            text = "Zoom 100% · Fit"
+        else:
+            text = f"Zoom {100 / zoom_factor:.0f}%"
+        self.zoom_status_lbl.configure(text=text)
 
     def _on_zoom_in(self) -> None:
         """Zoom in."""
@@ -965,15 +1189,15 @@ class AutonomousWarehouseApp:
 
         if result.found:
             if result.edge_count == 0:
-                self.route_badge.config(text="Source is Destination (0 Edges)", bg="#dcfce7", fg="#15803d")
+                self.route_badge.config(text="Source is Destination (0 Edges)", bg=self.palette["success_badge"], fg=self.palette["teal"])
             elif result.is_shortest:
-                self.route_badge.config(text=f"Optimal Route Found ({result.edge_count} Edges)", bg="#dcfce7", fg="#15803d")
+                self.route_badge.config(text=f"Optimal Route Found ({result.edge_count} Edges)", bg=self.palette["success_badge"], fg=self.palette["teal"])
             else:
-                self.route_badge.config(text=f"Route Found ({result.edge_count} Edges - Suboptimal)", bg="#fef3c7", fg="#b45309")
+                self.route_badge.config(text=f"Route Found ({result.edge_count} Edges - Suboptimal)", bg=self.palette["warning_badge"], fg=self.palette["warning"])
 
             self.path_text.insert(tk.END, result.get_path_display(labels))
         else:
-            self.route_badge.config(text="No Route Available", bg="#fee2e2", fg="#b91c1c")
+            self.route_badge.config(text="No Route Available", bg=self.palette["error_badge"], fg=self.palette["danger"])
             self.path_text.insert(tk.END, "No route available between the selected locations.\nCheck if pathways are blocked.")
 
         self.path_text.config(state="disabled")
@@ -1182,7 +1406,7 @@ class AutonomousWarehouseApp:
         self._cancel_animation_if_running()
         self.current_result = None
 
-        self.route_badge.config(text="No Search Run Yet", bg="#f1f5f9", fg="#475569")
+        self.route_badge.config(text="No Search Run Yet", bg=self.palette["badge"], fg=self.palette["text"])
         self.path_text.config(state="normal")
         self.path_text.delete("1.0", tk.END)
         self.path_text.insert(tk.END, "Select source & destination, then run navigation.")

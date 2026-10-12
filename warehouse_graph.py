@@ -92,8 +92,7 @@ class WarehouseGraph:
             pos = self.positions.get(node_id, (0.0, 0.0))
             self.graph.add_node(
                 node_id,
-                label=data["label"],
-                type=data["type"],
+                **data,
                 pos=pos,
             )
 
@@ -211,6 +210,19 @@ class WarehouseGraph:
         if node in self.graph.nodes:
             return self.graph.nodes[node].get("type", "Unknown")
         return "Unknown"
+
+    def get_node_short_label(self, node: str) -> str:
+        """Return a compact human-readable label for graph rendering."""
+        if node in self.graph.nodes:
+            data = self.graph.nodes[node]
+            short = data.get("short_label")
+            if short:
+                return str(short)
+            label = str(data.get("label", node))
+            if len(label) <= 16:
+                return label
+            return label[:15].rstrip() + "…"
+        return node
 
     def get_node_display(self, node: str) -> str:
         """Return a formatted string such as 'S: Storage Area'."""

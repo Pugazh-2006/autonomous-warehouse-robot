@@ -22,6 +22,12 @@ from algorithms import SearchResult
 class WarehouseVisualizer:
     """Manages the Matplotlib figure, dynamic scaling, and multi-scale rendering."""
 
+    # zoom_factor is the visible viewport as a fraction of the fitted map.
+    # Keeping it within these limits prevents nodes and labels from being
+    # pushed beyond the canvas while still allowing useful inspection.
+    MIN_ZOOM_FACTOR = 0.80
+    MAX_ZOOM_FACTOR = 1.80
+
     # Color Palette: Professional, restrained, accessible
     COLOR_BG = "#f8fafc"            # Slate-50 background
     COLOR_NODE_DEFAULT = "#94a3b8"  # Slate-400
@@ -42,6 +48,7 @@ class WarehouseVisualizer:
         warehouse: WarehouseGraph,
         on_edge_toggle_cb: Optional[Callable[[str, str], None]] = None,
         on_node_click_cb: Optional[Callable[[str], None]] = None,
+        on_zoom_change_cb: Optional[Callable[[float], None]] = None,
     ) -> None:
         """Initialize visualizer with parent widget and interaction callbacks.
 
@@ -50,10 +57,12 @@ class WarehouseVisualizer:
             warehouse: WarehouseGraph instance.
             on_edge_toggle_cb: Callback when an edge is clicked (u, v).
             on_node_click_cb: Callback when a node is clicked (node_id).
+            on_zoom_change_cb: Callback when the visible zoom changes.
         """
         self.warehouse = warehouse
         self.on_edge_toggle_cb = on_edge_toggle_cb
         self.on_node_click_cb = on_node_click_cb
+        self.on_zoom_change_cb = on_zoom_change_cb
 
         # Setup Matplotlib Figure
         self.fig = Figure(figsize=(6.8, 5.2), dpi=100, facecolor=self.COLOR_BG)
@@ -65,16 +74,55 @@ class WarehouseVisualizer:
         self.base_xlim: Tuple[float, float] = (0.0, 6.0)
         self.base_ylim: Tuple[float, float] = (0.0, 4.0)
         self.selected_node: Optional[str] = None
+        self.dark_mode: bool = True
+        self._viewport_border: Optional[patches.Rectangle] = None
+        self._pan_active = False
+        self._pan_start_pixel: Optional[Tuple[float, float]] = None
+        self._pan_start_xlim: Tuple[float, float] = self.base_xlim
+        self._pan_start_ylim: Tuple[float, float] = self.base_ylim
 
         # Create canvas
         self.canvas = FigureCanvasTkAgg(self.fig, master=master_widget)
         self.canvas_widget = self.canvas.get_tk_widget()
 
         # Connect mouse events
-        self.canvas.mpl_connect("button_press_event", self._handle_click)
+        self.canvas.mpl_connect("button_press_event", self._handle_button_press)
+        self.canvas.mpl_connect("button_release_event", self._handle_button_release)
+        self.canvas.mpl_connect("motion_notify_event", self._handle_motion)
         self.canvas.mpl_connect("scroll_event", self._handle_scroll)
 
         # Initial render
+        self.draw()
+
+    def set_theme(self, dark_mode: bool) -> None:
+        """Update graph colors to match the application's light/dark theme."""
+        self.dark_mode = dark_mode
+        if dark_mode:
+            self.COLOR_BG = "#0b1627"
+            self.COLOR_NODE_DEFAULT = "#344a66"
+            self.COLOR_NODE_SOURCE = "#19bda8"
+            self.COLOR_NODE_DEST = "#ef6680"
+            self.COLOR_NODE_ROUTE = "#4f8cff"
+            self.COLOR_NODE_VISITED = "#d99a3f"
+            self.COLOR_NODE_ACTIVE = "#9c7bff"
+            self.COLOR_NODE_SELECTED = "#35b9ec"
+            self.COLOR_EDGE_OPEN = "#57708f"
+            self.COLOR_EDGE_BLOCKED = "#f05d75"
+            self.COLOR_EDGE_ROUTE = "#4f8cff"
+        else:
+            self.COLOR_BG = "#f8fafc"
+            self.COLOR_NODE_DEFAULT = "#94a3b8"
+            self.COLOR_NODE_SOURCE = "#0d9488"
+            self.COLOR_NODE_DEST = "#e11d48"
+            self.COLOR_NODE_ROUTE = "#2563eb"
+            self.COLOR_NODE_VISITED = "#f59e0b"
+            self.COLOR_NODE_ACTIVE = "#8b5cf6"
+            self.COLOR_NODE_SELECTED = "#0284c7"
+            self.COLOR_EDGE_OPEN = "#64748b"
+            self.COLOR_EDGE_BLOCKED = "#dc2626"
+            self.COLOR_EDGE_ROUTE = "#2563eb"
+        self.fig.set_facecolor(self.COLOR_BG)
+        self.ax.set_facecolor(self.COLOR_BG)
         self.draw()
 
     def get_widget(self):
@@ -88,28 +136,86 @@ class WarehouseVisualizer:
     def reset_view(self) -> None:
         """Reset zoom factor to auto-fit."""
         self.zoom_factor = 1.0
+        self._notify_zoom_changed()
         self.draw()
 
     def zoom_in(self) -> None:
         """Zoom in by 20%."""
-        self.zoom_factor = max(0.4, self.zoom_factor * 0.8)
+        self.zoom_factor = max(self.MIN_ZOOM_FACTOR, self.zoom_factor * 0.8)
+        self._notify_zoom_changed()
         self._apply_zoom()
 
     def zoom_out(self) -> None:
         """Zoom out by 25%."""
-        self.zoom_factor = min(2.5, self.zoom_factor * 1.25)
+        self.zoom_factor = min(self.MAX_ZOOM_FACTOR, self.zoom_factor * 1.25)
+        self._notify_zoom_changed()
         self._apply_zoom()
+
+    def _notify_zoom_changed(self) -> None:
+        """Notify the application so it can show the current zoom limit."""
+        if self.on_zoom_change_cb:
+            self.on_zoom_change_cb(self.zoom_factor)
 
     def _apply_zoom(self) -> None:
         """Apply current zoom factor to axis limits."""
-        cx = (self.base_xlim[0] + self.base_xlim[1]) / 2.0
-        cy = (self.base_ylim[0] + self.base_ylim[1]) / 2.0
+        current_xlim = self.ax.get_xlim()
+        current_ylim = self.ax.get_ylim()
+        cx = (current_xlim[0] + current_xlim[1]) / 2.0
+        cy = (current_ylim[0] + current_ylim[1]) / 2.0
         dx = (self.base_xlim[1] - self.base_xlim[0]) * self.zoom_factor / 2.0
         dy = (self.base_ylim[1] - self.base_ylim[0]) * self.zoom_factor / 2.0
 
-        self.ax.set_xlim(cx - dx, cx + dx)
-        self.ax.set_ylim(cy - dy, cy + dy)
+        xlim = self._clamp_pan_axis(cx - dx, cx + dx, self.base_xlim)
+        ylim = self._clamp_pan_axis(cy - dy, cy + dy, self.base_ylim)
+        self.ax.set_xlim(*xlim)
+        self.ax.set_ylim(*ylim)
+        self._draw_viewport_border()
         self.canvas.draw_idle()
+
+    @staticmethod
+    def _clamp_pan_axis(
+        proposed_low: float,
+        proposed_high: float,
+        base_limits: Tuple[float, float],
+    ) -> Tuple[float, float]:
+        """Keep a panned viewport aligned with the fitted map bounds."""
+        view_size = proposed_high - proposed_low
+        base_low, base_high = base_limits
+        base_size = base_high - base_low
+        if view_size >= base_size:
+            center = (base_low + base_high) / 2.0
+            return center - view_size / 2.0, center + view_size / 2.0
+
+        low_limit = base_low
+        high_limit = base_high - view_size
+        clamped_low = min(max(proposed_low, low_limit), high_limit)
+        return clamped_low, clamped_low + view_size
+
+    def _draw_viewport_border(self) -> None:
+        """Show the current visible map area as a subtle dashed boundary."""
+        if self._viewport_border is not None:
+            try:
+                self._viewport_border.remove()
+            except ValueError:
+                # The axes may have been cleared since the last draw.
+                pass
+
+        x0, x1 = self.ax.get_xlim()
+        y0, y1 = self.ax.get_ylim()
+        border_color = "#607a9d" if self.dark_mode else "#9aaabd"
+        self._viewport_border = patches.Rectangle(
+            (x0, y0),
+            x1 - x0,
+            y1 - y0,
+            fill=False,
+            edgecolor=border_color,
+            linewidth=1.0,
+            linestyle=(0, (5, 4)),
+            alpha=0.85,
+            zorder=0,
+            clip_on=False,
+        )
+        self.ax.add_patch(self._viewport_border)
 
     def draw(
         self,
@@ -131,6 +237,7 @@ class WarehouseVisualizer:
             active_node: Currently active node being evaluated during animation.
         """
         self.ax.clear()
+        self._viewport_border = None
         self.ax.set_facecolor(self.COLOR_BG)
         self.ax.axis("off")
 
@@ -155,28 +262,28 @@ class WarehouseVisualizer:
             font_size = 11.0
             lw_edge = 2.6
             lw_route = 5.0
-            show_external_labels = True
+            label_mode = "full"
         elif node_count <= 18:
             node_radius = 0.26
             font_size = 9.0
             lw_edge = 2.2
             lw_route = 4.2
-            show_external_labels = False
+            label_mode = "compact"
         elif node_count <= 35:
             node_radius = 0.22
-            font_size = 7.5
+            font_size = 7.2
             lw_edge = 1.8
             lw_route = 3.6
-            show_external_labels = False
+            label_mode = "compact"
         else:
             node_radius = 0.19
-            font_size = 6.2
+            font_size = 6.4
             lw_edge = 1.5
             lw_route = 3.2
-            show_external_labels = False
+            label_mode = "compact"
 
-        pad_x = max(0.8, span_x * 0.10)
-        pad_y = max(0.8, span_y * 0.12)
+        pad_x = max(1.05, span_x * 0.14)
+        pad_y = max(0.95, span_y * 0.16)
         legend_space = pad_y * 1.25
 
         self.base_xlim = (min_x - pad_x, max_x + pad_x)
@@ -189,7 +296,11 @@ class WarehouseVisualizer:
         dy = (self.base_ylim[1] - self.base_ylim[0]) * self.zoom_factor / 2.0
         self.ax.set_xlim(cx - dx, cx + dx)
         self.ax.set_ylim(cy - dy, cy + dy)
-        self.ax.set_aspect("equal")
+        # A strict equal aspect makes a wide warehouse occupy only a small
+        # strip of a tall Tk panel. Larger maps use the available canvas while
+        # small educational maps retain their true geometric proportions.
+        self.ax.set_aspect("equal" if node_count <= 18 else "auto")
+        self._draw_viewport_border()
 
         # Determine effective path and visited sets
         effective_path: List[str] = []
@@ -225,7 +336,7 @@ class WarehouseVisualizer:
             active_node,
             node_radius,
             font_size,
-            show_external_labels,
+            label_mode,
         )
 
         # 5. Draw Legend
@@ -324,7 +435,7 @@ class WarehouseVisualizer:
                 (p1[0] + t_start * dx, p1[1] + t_start * dy),
                 (p1[0] + t_end * dx, p1[1] + t_end * dy),
                 arrowstyle=f"Simple,tail_width=2.0,head_width={head_w:.1f},head_length={head_l:.1f}",
-                facecolor="#ffffff",
+                facecolor="#e8f0fb" if self.dark_mode else "#ffffff",
                 edgecolor="#1e3a8a",
                 linewidth=1.1,
                 zorder=4,
@@ -340,7 +451,7 @@ class WarehouseVisualizer:
         active_node: Optional[str],
         node_radius: float,
         font_size: float,
-        show_external_labels: bool,
+        label_mode: str,
     ) -> None:
         """Render nodes with color hierarchy and scaling."""
         positions = self.warehouse.positions
@@ -426,26 +537,56 @@ class WarehouseVisualizer:
                 zorder=6,
             )
 
-            # External label only for small maps where space is ample
-            if show_external_labels:
+            # Every node keeps a visible human-readable label. Larger maps use
+            # short labels so the warehouse remains legible instead of hiding
+            # all names and leaving only opaque IDs on the canvas.
+            if label_mode == "full":
+                external_label = f"{label}\n({node_type})"
+                external_size = 8.0
+                pad = 0.22
+            else:
+                external_label = self._compact_node_label(node_id, node_type, label)
+                external_size = 6.0 if len(self.warehouse.get_node_ids()) > 35 else 7.0
+                pad = 0.12
+
+            if label_mode in ("full", "compact"):
                 offset_y = (node_radius + 0.16) if y >= 2.0 else -(node_radius + 0.16)
                 self.ax.text(
                     x, y + offset_y,
-                    f"{label}\n({node_type})",
+                    external_label,
                     ha="center",
                     va="center",
-                    fontsize=8.0,
+                    fontsize=external_size,
                     fontweight="semibold",
-                    color="#0f172a",
+                    color="#e8f0fb" if self.dark_mode else "#0f172a",
                     bbox=dict(
-                        boxstyle="round,pad=0.22",
-                        facecolor="white",
-                        edgecolor="#cbd5e1",
-                        linewidth=0.7,
-                        alpha=0.92,
+                        boxstyle=f"round,pad={pad}",
+                        facecolor="#172840" if self.dark_mode else "white",
+                        edgecolor="#385574" if self.dark_mode else "#cbd5e1",
+                        linewidth=0.55,
+                        alpha=0.86,
                     ),
                     zorder=6,
                 )
+
+    @staticmethod
+    def _compact_node_label(node_id: str, node_type: str, label: str) -> str:
+        """Create a readable one-line label for medium and large maps."""
+        digits = "".join(ch for ch in node_id if ch.isdigit())
+        suffix = digits[-2:] if digits else node_id[-2:]
+        if node_type == "Rack":
+            return f"Rack {suffix}"
+        if node_type == "Storage":
+            return f"In {suffix}"
+        if node_type == "Intersection":
+            return f"J-{suffix}"
+        if node_type == "Packing Station":
+            return f"Pack {suffix}"
+        if node_type == "Charging Station":
+            return "Charge"
+        if node_type == "Exit":
+            return f"Exit {suffix}"
+        return label[:14]
 
     def _draw_legend(self) -> None:
         """Render a clean custom legend for graph colors."""
@@ -461,20 +602,22 @@ class WarehouseVisualizer:
             Line2D([0], [0], color=self.COLOR_EDGE_OPEN, lw=2.0, label="Open Pathway"),
             Line2D([0], [0], color=self.COLOR_EDGE_ROUTE, lw=3.8, label="Robot Route"),
             Line2D([0], [0], color=self.COLOR_EDGE_BLOCKED, lw=2.0, linestyle="--", label="Blocked Pathway"),
-            Line2D([0], [0], marker=">", color="#2563eb", markerfacecolor="white",
+            Line2D([0], [0], marker=">", color=self.COLOR_EDGE_ROUTE, markerfacecolor="#e8f0fb" if self.dark_mode else "white",
                    markeredgecolor="#1e3a8a", markeredgewidth=1.1, label="Route Direction", markersize=8),
         ]
-        self.ax.legend(
+        legend = self.ax.legend(
             handles=legend_elements,
             loc="lower center",
             bbox_to_anchor=(0.5, 0.0),
             ncol=4,
             fontsize=7.5,
             frameon=True,
-            facecolor="white",
-            edgecolor="#cbd5e1",
+            facecolor="#14243a" if self.dark_mode else "white",
+            edgecolor="#385574" if self.dark_mode else "#cbd5e1",
             framealpha=0.96,
         )
+        for legend_text in legend.get_texts():
+            legend_text.set_color("#e8f0fb" if self.dark_mode else "#243447")
 
     def _handle_scroll(self, event) -> None:
         """Handle mouse wheel zooming."""
@@ -482,6 +625,58 @@ class WarehouseVisualizer:
             self.zoom_in()
         elif event.button == "down":
             self.zoom_out()
+
+    def _handle_button_press(self, event) -> None:
+        """Start middle-button panning or route left-click interactions."""
+        if event.button == 2:
+            self._pan_active = True
+            self._pan_start_pixel = (float(event.x), float(event.y))
+            self._pan_start_xlim = self.ax.get_xlim()
+            self._pan_start_ylim = self.ax.get_ylim()
+            self.canvas_widget.configure(cursor="hand2")
+            return
+
+        if event.button == 1:
+            self._handle_click(event)
+
+    def _handle_button_release(self, event) -> None:
+        """Stop middle-button panning and restore the normal cursor."""
+        if event.button == 2:
+            self._pan_active = False
+            self._pan_start_pixel = None
+            self.canvas_widget.configure(cursor="arrow")
+
+    def _handle_motion(self, event) -> None:
+        """Move the visible map while the middle mouse button is held."""
+        if not self._pan_active or self._pan_start_pixel is None:
+            return
+        if event.x is None or event.y is None:
+            return
+
+        bbox = self.ax.get_window_extent()
+        if bbox.width <= 0 or bbox.height <= 0:
+            return
+
+        start_x, start_y = self._pan_start_pixel
+        delta_x = (float(event.x) - start_x) / bbox.width
+        delta_y = (float(event.y) - start_y) / bbox.height
+        x_span = self._pan_start_xlim[1] - self._pan_start_xlim[0]
+        y_span = self._pan_start_ylim[1] - self._pan_start_ylim[0]
+
+        proposed_xlim = (
+            self._pan_start_xlim[0] - delta_x * x_span,
+            self._pan_start_xlim[1] - delta_x * x_span,
+        )
+        proposed_ylim = (
+            self._pan_start_ylim[0] - delta_y * y_span,
+            self._pan_start_ylim[1] - delta_y * y_span,
+        )
+        xlim = self._clamp_pan_axis(*proposed_xlim, self.base_xlim)
+        ylim = self._clamp_pan_axis(*proposed_ylim, self.base_ylim)
+        self.ax.set_xlim(*xlim)
+        self.ax.set_ylim(*ylim)
+        self._draw_viewport_border()
+        self.canvas.draw_idle()
 
     def _handle_click(self, event) -> None:
         """Handle canvas click for edge blocking and node inspection."""
