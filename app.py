@@ -73,19 +73,19 @@ class AutonomousWarehouseApp:
         """Return the current glass-card UI palette."""
         if self.dark_mode:
             return {
-                "bg": "#09111f",
-                "panel": "#0e1a2b",
-                "card": "#14243a",
-                "card_alt": "#192b45",
-                "input": "#0b1728",
-                "border": "#2b4566",
-                "text": "#e8f0fb",
-                "muted": "#95a9c2",
-                "header": "#060d19",
-                "accent": "#4f8cff",
-                "accent_hover": "#6ca0ff",
-                "teal": "#20c7b1",
-                "teal_hover": "#39e0c9",
+                "bg": "#09111e",
+                "panel": "#0d1726",
+                "card": "#101f33",
+                "card_alt": "#16263d",
+                "input": "#0a1422",
+                "border": "#243a57",
+                "text": "#edf3fc",
+                "muted": "#9aaec6",
+                "header": "#070e18",
+                "accent": "#4b82f7",
+                "accent_hover": "#6597ff",
+                "teal": "#25c5b0",
+                "teal_hover": "#3ed9c4",
                 "danger": "#ef6b82",
                 "warning": "#f0b35b",
                 "disabled": "#30435d",
@@ -136,7 +136,7 @@ class AutonomousWarehouseApp:
         style.configure("TFrame", background=p["bg"])
         style.configure("TLabel", background=p["bg"], foreground=p["text"])
         style.configure("Header.TFrame", background=p["header"])
-        style.configure("TLabelframe", background=p["card"], borderwidth=1, relief="solid")
+        style.configure("TLabelframe", background=p["card"], borderwidth=1, relief="flat")
         style.configure(
             "TLabelframe.Label",
             background=p["card"],
@@ -144,7 +144,7 @@ class AutonomousWarehouseApp:
             foreground=p["text"],
         )
         style.configure("TNotebook", background=p["bg"], borderwidth=0)
-        style.configure("TNotebook.Tab", padding=(10, 6), font=("Segoe UI", 9), background=p["card"], foreground=p["text"])
+        style.configure("TNotebook.Tab", padding=(11, 7), font=("Segoe UI", 9), background=p["card"], foreground=p["muted"])
         style.map("TNotebook.Tab", background=[("selected", p["card_alt"])], foreground=[("selected", p["accent"])])
         style.configure("TCombobox", padding=4, fieldbackground=p["input"], background=p["input"], foreground=p["text"])
         style.map("TCombobox", fieldbackground=[("readonly", p["input"])], foreground=[("readonly", p["text"])])
@@ -169,7 +169,7 @@ class AutonomousWarehouseApp:
             font=("Segoe UI", 9, "bold"),
             background=p["accent"],
             foreground="#ffffff",
-            padding=(10, 7),
+            padding=(10, 8),
             borderwidth=0,
         )
         style.map(
@@ -183,7 +183,7 @@ class AutonomousWarehouseApp:
             font=("Segoe UI", 9, "bold"),
             background=p["teal"],
             foreground="#ffffff",
-            padding=(10, 7),
+            padding=(10, 8),
             borderwidth=0,
         )
         style.map(
@@ -197,7 +197,7 @@ class AutonomousWarehouseApp:
             font=("Segoe UI", 9),
             background=p["card_alt"],
             foreground=p["text"],
-            padding=(8, 6),
+            padding=(8, 7),
             borderwidth=1,
         )
         style.map(
@@ -243,7 +243,8 @@ class AutonomousWarehouseApp:
         self.route_badge.configure(bg=p["badge"], fg=p["text"])
         self.path_text.configure(bg=p["input"], fg=p["text"], insertbackground=p["text"])
         self.theory_text.configure(bg=p["input"], fg=p["text"], insertbackground=p["text"])
-        self.left_canvas.configure(bg=p["panel"])
+        if self.left_canvas is not None:
+            self.left_canvas.configure(bg=p["panel"])
         self.edge_canvas.configure(bg=p["input"], highlightbackground=p["border"])
 
         # Explicit ttk foregrounds created by individual widgets are refreshed
@@ -282,18 +283,18 @@ class AutonomousWarehouseApp:
 
         # 2. Body: Three-area layout (Left Controls, Center Canvas, Right Results)
         body_paned = ttk.PanedWindow(main_container, orient=tk.HORIZONTAL)
-        body_paned.pack(fill=tk.BOTH, expand=True, padx=8, pady=6)
+        body_paned.pack(fill=tk.BOTH, expand=True, padx=12, pady=10)
 
         # Left Panel (Fixed width scrollable controls)
-        left_frame = ttk.Frame(body_paned, width=340)
+        left_frame = ttk.Frame(body_paned, width=300)
         body_paned.add(left_frame, weight=0)
 
         # Center Panel (Large Map Canvas)
         center_frame = ttk.Frame(body_paned)
-        body_paned.add(center_frame, weight=3)
+        body_paned.add(center_frame, weight=4)
 
         # Right Panel (Results & Inspector)
-        right_frame = ttk.Frame(body_paned, width=350)
+        right_frame = ttk.Frame(body_paned, width=330)
         body_paned.add(right_frame, weight=1)
 
         # Populate panels
@@ -350,44 +351,23 @@ class AutonomousWarehouseApp:
     # LEFT PANEL: Map Selection, Controls, Animation, Pathways
     # =========================================================================
     def _build_left_panel(self, parent: ttk.Frame) -> None:
-        """Construct the scrollable left control panel."""
-        canvas = tk.Canvas(parent, bg=self.palette["panel"], highlightthickness=0)
-        self.left_canvas = canvas
-        scrollbar = ttk.Scrollbar(
-            parent,
-            orient="vertical",
-            command=canvas.yview,
-            style="Panel.Vertical.TScrollbar",
-        )
-        scroll_content = ttk.Frame(canvas)
+        """Build a focused mission sidebar with pathways in their own tab."""
+        self.left_canvas = None
+        sidebar_tabs = ttk.Notebook(parent)
+        sidebar_tabs.pack(fill=tk.BOTH, expand=True)
 
-        scroll_content.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all")),
-        )
-        canvas_window = canvas.create_window((0, 0), window=scroll_content, anchor="nw")
+        mission_tab = ttk.Frame(sidebar_tabs, padding=6)
+        pathways_tab = ttk.Frame(sidebar_tabs, padding=6)
+        sidebar_tabs.add(mission_tab, text=" Mission ")
+        sidebar_tabs.add(pathways_tab, text=" Pathways ")
 
-        def _on_canvas_resize(event):
-            canvas.itemconfig(canvas_window, width=event.width)
-
-        canvas.bind("<Configure>", _on_canvas_resize)
-        canvas.configure(yscrollcommand=scrollbar.set)
-
-        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-
-        # 1. Map Selection Card
-        self._build_map_selection_card(scroll_content)
-
-        # 2. Navigation Controls Card
-        self._build_navigation_controls_card(scroll_content)
-
-        # 3. Pathway Status & Blockages Card
-        self._build_pathway_control_card(scroll_content)
+        self._build_map_selection_card(mission_tab)
+        self._build_navigation_controls_card(mission_tab)
+        self._build_pathway_control_card(pathways_tab)
 
     def _build_map_selection_card(self, parent: ttk.Frame) -> None:
         """Build Map Selection dropdown, seed control, and generation buttons."""
-        map_card = ttk.LabelFrame(parent, text=" Warehouse Map Selector ", padding=8)
+        map_card = ttk.LabelFrame(parent, text=" Warehouse Map ", padding=10)
         map_card.pack(fill=tk.X, pady=(0, 6), padx=4)
 
         # Map Selector Dropdown
@@ -450,7 +430,7 @@ class AutonomousWarehouseApp:
 
     def _build_navigation_controls_card(self, parent: ttk.Frame) -> None:
         """Build Source, Destination, Algorithm, and Animation controls."""
-        ctrl_card = ttk.LabelFrame(parent, text=" Navigation & Search ", padding=8)
+        ctrl_card = ttk.LabelFrame(parent, text=" Plan a Route ", padding=10)
         ctrl_card.pack(fill=tk.X, pady=(0, 6), padx=4)
 
         # Source Selection
@@ -551,7 +531,7 @@ class AutonomousWarehouseApp:
 
     def _build_pathway_control_card(self, parent: ttk.Frame) -> None:
         """Build scrollable list of warehouse pathways with blockage toggles."""
-        pathway_card = ttk.LabelFrame(parent, text=" Pathway Status & Blockages ", padding=8)
+        pathway_card = ttk.LabelFrame(parent, text=" Manage Pathways ", padding=10)
         pathway_card.pack(fill=tk.BOTH, expand=True, pady=(0, 6), padx=4)
 
         info_lbl = ttk.Label(
@@ -609,7 +589,7 @@ class AutonomousWarehouseApp:
     # =========================================================================
     def _build_center_panel(self, parent: ttk.Frame) -> None:
         """Construct the central visualization canvas with top status bar and zoom."""
-        center_card = ttk.LabelFrame(parent, text=" Warehouse Floor Topology (Interactive Canvas) ", padding=4)
+        center_card = ttk.LabelFrame(parent, text=" Warehouse Floor ", padding=6)
         center_card.pack(fill=tk.BOTH, expand=True)
 
         # Top Canvas Info & Zoom Toolbar. Keep controls on their own row so
@@ -674,7 +654,7 @@ class AutonomousWarehouseApp:
 
         # Tab 1: Search Metrics & Navigation Path
         res_tab = ttk.Frame(notebook, padding=6)
-        notebook.add(res_tab, text=" Results & Metrics ")
+        notebook.add(res_tab, text=" Route ")
 
         self._build_results_card(res_tab)
         self._build_node_inspector_card(res_tab)
@@ -682,12 +662,12 @@ class AutonomousWarehouseApp:
 
         # Tab 2: Visited Order Treeview
         visited_tab = ttk.Frame(notebook, padding=6)
-        notebook.add(visited_tab, text=" Visited Sequence ")
+        notebook.add(visited_tab, text=" Search Steps ")
         self._build_visited_table(visited_tab)
 
         # Tab 3: AI Theory & Concepts
         theory_tab = ttk.Frame(notebook, padding=6)
-        notebook.add(theory_tab, text=" AI Theory ")
+        notebook.add(theory_tab, text=" How It Works ")
         self._build_theory_view(theory_tab)
 
     def _build_results_card(self, parent: ttk.Frame) -> None:
@@ -1178,7 +1158,7 @@ class AutonomousWarehouseApp:
 
         if result.found:
             self.update_status(
-                f"Route found: {result.get_path_arrow_string()}  ({result.edge_count} edges in {result.execution_time_ms:.2f} ms)",
+                f"Route ready • {result.edge_count} edges • {result.visited_count} locations explored • {result.execution_time_ms:.2f} ms",
                 "info",
             )
         else:
