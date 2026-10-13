@@ -407,7 +407,7 @@ class AutonomousWarehouseApp:
         )
         self.map_combo.current(0)
         self.map_combo.pack(fill=tk.X, pady=(0, 4))
-        self.map_combo.bind("<<ComboboxSelected>>", self._preview_selected_map)
+        self.map_combo.bind("<<ComboboxSelected>>", self._on_map_selection_changed)
 
         # Map Description
         self.map_desc_lbl = ttk.Label(
@@ -436,23 +436,17 @@ class AutonomousWarehouseApp:
         )
         self.btn_gen_random.pack(side=tk.RIGHT)
 
-        # Map Action Buttons
+        # Map choices apply immediately. Reset remains available when the user
+        # wants to return to the clean version of the current layout.
         btn_grid = ttk.Frame(map_card)
         btn_grid.pack(fill=tk.X)
-
-        ttk.Button(
-            btn_grid,
-            text="Load Selected Map",
-            style="Teal.TButton",
-            command=self._load_selected_map_from_combo,
-        ).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 2))
 
         ttk.Button(
             btn_grid,
             text="Reset Map",
             style="Outline.TButton",
             command=self.reset_current_map,
-        ).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(2, 0))
+        ).pack(fill=tk.X)
 
     def _build_navigation_controls_card(self, parent: ttk.Frame) -> None:
         """Build Source, Destination, Algorithm, and Animation controls."""
@@ -925,19 +919,6 @@ class AutonomousWarehouseApp:
 
         self.update_status(f"Loaded {target_map.name} ({target_map.node_count} nodes).", "info")
 
-    def _preview_selected_map(self, event=None) -> None:
-        """Show the selected layout description before replacing the active map."""
-        idx = self.map_combo.current()
-        all_maps = self.map_manager.get_all_maps()
-
-        if idx < len(all_maps):
-            self.map_desc_lbl.config(text=all_maps[idx].description)
-        else:
-            self.map_desc_lbl.config(
-                text="Generate a connected warehouse from the seed shown below. "
-                "Use the same seed to reproduce the same layout."
-            )
-
     def _on_map_selection_changed(self, event=None) -> None:
         """Load the layout currently selected in the map chooser."""
         idx = self.map_combo.current()
@@ -947,10 +928,6 @@ class AutonomousWarehouseApp:
             self.load_selected_map(all_maps[idx].key)
         else:
             self.generate_new_random_map()
-
-    def _load_selected_map_from_combo(self) -> None:
-        """Apply the layout currently selected in the map chooser."""
-        self._on_map_selection_changed()
 
     def generate_new_random_map(self) -> None:
         """Generate and load a new procedural warehouse map using the seed entry."""
@@ -1268,8 +1245,12 @@ class AutonomousWarehouseApp:
     def start_animation(self) -> None:
         """Play the already calculated search as an educational walkthrough."""
         if not self.current_result or not self.current_result.found:
-            self.update_status("Find a route before playing the search animation.", "warning")
-            return
+            # The visible button stays disabled until a route exists, but this
+            # fallback preserves the original public behavior for callers that
+            # start an animation directly.
+            self.run_navigation_direct()
+            if not self.current_result or not self.current_result.found:
+                return
 
         result = self.current_result
 
