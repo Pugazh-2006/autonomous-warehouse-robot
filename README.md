@@ -120,6 +120,22 @@ sudo apt-get install python3-tk
 python app.py
 ```
 
+## Windows executable
+
+The project includes `launcher.py`, which checks the packaged runtime for Tkinter, NetworkX, and Matplotlib before opening the simulator. A standalone build can be launched by double-clicking:
+
+```text
+dist/AutonomousWarehouseRobot.exe
+```
+
+The executable bundles Python and the project dependencies, so the client does not need to install Python or run a terminal command. To rebuild it on Windows:
+
+```powershell
+py -3.10 -m pip install -r requirements.txt
+py -3.10 -m pip install pyinstaller
+pyinstaller --noconfirm --clean --onefile --windowed --name AutonomousWarehouseRobot --hidden-import=matplotlib.backends.backend_tkagg launcher.py
+```
+
 ## Test
 
 Run the complete test suite from the project directory:
@@ -147,6 +163,7 @@ autonomous-warehouse-robot/
 ├── map_manager.py            # Predefined map registry
 ├── map_generator.py          # Seeded random warehouse generation
 ├── visualization.py          # Matplotlib graph rendering and map controls
+├── launcher.py                # Runtime check and packaged-app entry point
 ├── requirements.txt          # Python dependencies
 ├── README_preview.png        # Current dark-mode interface preview
 ├── build_video.py            # Optional local demo compositor

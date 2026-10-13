@@ -32,3 +32,9 @@ desktop.ini
 
 # Temporary debug logs
 *.log
+
+# PyInstaller build artifacts
+build/
+dist/
+*.spec
+*.exe
