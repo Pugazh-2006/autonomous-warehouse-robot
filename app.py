@@ -407,7 +407,7 @@ class AutonomousWarehouseApp:
         )
         self.map_combo.current(0)
         self.map_combo.pack(fill=tk.X, pady=(0, 4))
-        self.map_combo.bind("<<ComboboxSelected>>", self._on_map_selection_changed)
+        self.map_combo.bind("<<ComboboxSelected>>", self._preview_selected_map)
 
         # Map Description
         self.map_desc_lbl = ttk.Label(
@@ -430,7 +430,7 @@ class AutonomousWarehouseApp:
 
         self.btn_gen_random = ttk.Button(
             seed_frame,
-            text="🎲 Random",
+            text="Generate",
             style="Outline.TButton",
             command=self.generate_new_random_map,
         )
@@ -442,7 +442,7 @@ class AutonomousWarehouseApp:
 
         ttk.Button(
             btn_grid,
-            text="Load Map",
+            text="Load Selected Map",
             style="Teal.TButton",
             command=self._load_selected_map_from_combo,
         ).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 2))
@@ -492,10 +492,19 @@ class AutonomousWarehouseApp:
             command=self._on_algorithm_changed,
         ).pack(anchor="w", pady=1)
 
-        # Run Navigation button
+        workflow_hint = ttk.Label(
+            ctrl_card,
+            text="1. Choose locations  •  2. Find route  •  3. Play search",
+            font=("Segoe UI", 8),
+            foreground=self.palette["muted"],
+            wraplength=300,
+        )
+        workflow_hint.pack(anchor="w", pady=(0, 5))
+
+        # Find the route before offering the optional visual walkthrough.
         self.btn_run = ttk.Button(
             ctrl_card,
-            text="🚀  Run Navigation",
+            text="Find Route",
             style="Primary.TButton",
             command=self.run_navigation_direct,
         )
@@ -507,9 +516,10 @@ class AutonomousWarehouseApp:
 
         self.btn_animate = ttk.Button(
             anim_box,
-            text="▶ Start Animation",
+            text="▶ Play Search",
             style="Teal.TButton",
             command=self.start_animation,
+            state="disabled",
         )
         self.btn_animate.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 2))
 
@@ -540,7 +550,7 @@ class AutonomousWarehouseApp:
         # Clear Results button
         ttk.Button(
             ctrl_card,
-            text="Clear Results",
+            text="Clear Search",
             style="Outline.TButton",
             command=self.clear_results,
         ).pack(fill=tk.X, pady=(2, 0))
@@ -552,7 +562,7 @@ class AutonomousWarehouseApp:
 
         info_lbl = ttk.Label(
             pathway_card,
-            text="Toggle checkboxes or click graph edges to block corridors:",
+            text="Click a corridor or select it here to close it temporarily.",
             wraplength=300,
             font=("Segoe UI", 8),
             foreground="#475569",
@@ -595,17 +605,10 @@ class AutonomousWarehouseApp:
 
         ttk.Button(
             batch_box,
-            text="Unblock All",
+            text="Reopen All Pathways",
             style="Outline.TButton",
             command=self.unblock_all_pathways,
-        ).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 2))
-
-        ttk.Button(
-            batch_box,
-            text="Clear Blockages",
-            style="Outline.TButton",
-            command=self.unblock_all_pathways,
-        ).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(2, 0))
+        ).pack(fill=tk.X)
 
     # =========================================================================
     # CENTER PANEL: Map Banner & Interactive Matplotlib Canvas
@@ -651,7 +654,7 @@ class AutonomousWarehouseApp:
         help_row.pack(fill=tk.X, pady=(2, 0))
         self.map_help_lbl = ttk.Label(
             help_row,
-            text="Click a node for details  ·  Click a corridor to block it  ·  Middle-drag to pan",
+            text="Click a node for details  ·  Click a corridor to close or reopen it  ·  Middle-drag to pan",
             font=("Segoe UI", 8),
             foreground="#64748b",
         )
@@ -922,20 +925,31 @@ class AutonomousWarehouseApp:
 
         self.update_status(f"Loaded {target_map.name} ({target_map.node_count} nodes).", "info")
 
-    def _on_map_selection_changed(self, event=None) -> None:
-        """Handle combobox map selection change."""
+    def _preview_selected_map(self, event=None) -> None:
+        """Show the selected layout description before replacing the active map."""
         idx = self.map_combo.current()
         all_maps = self.map_manager.get_all_maps()
 
         if idx < len(all_maps):
-            key = all_maps[idx].key
-            self.load_selected_map(key)
+            self.map_desc_lbl.config(text=all_maps[idx].description)
         else:
-            # Procedural Random Map option
+            self.map_desc_lbl.config(
+                text="Generate a connected warehouse from the seed shown below. "
+                "Use the same seed to reproduce the same layout."
+            )
+
+    def _on_map_selection_changed(self, event=None) -> None:
+        """Load the layout currently selected in the map chooser."""
+        idx = self.map_combo.current()
+        all_maps = self.map_manager.get_all_maps()
+
+        if idx < len(all_maps):
+            self.load_selected_map(all_maps[idx].key)
+        else:
             self.generate_new_random_map()
 
     def _load_selected_map_from_combo(self) -> None:
-        """Trigger loading from current combo selection."""
+        """Apply the layout currently selected in the map chooser."""
         self._on_map_selection_changed()
 
     def generate_new_random_map(self) -> None:
@@ -1006,6 +1020,7 @@ class AutonomousWarehouseApp:
     # =========================================================================
     def _on_canvas_edge_clicked(self, u: str, v: str) -> None:
         """Handle clicking directly on an edge on the Matplotlib canvas."""
+        self._invalidate_search_result()
         now_blocked = self.warehouse.toggle_edge_block(u, v)
         edge = canonical_edge(u, v)
         if edge in self.edge_check_vars:
@@ -1065,6 +1080,7 @@ class AutonomousWarehouseApp:
         if var is None:
             return
 
+        self._invalidate_search_result()
         if var.get():
             self.warehouse.block_edge(edge[0], edge[1])
             self.update_status(f"Pathway blocked: {edge[0]} ↔ {edge[1]}", "warning")
@@ -1077,6 +1093,7 @@ class AutonomousWarehouseApp:
 
     def unblock_all_pathways(self) -> None:
         """Clear all pathway blockages."""
+        self._invalidate_search_result()
         self.warehouse.reset_blockages()
         self._refresh_pathway_checkboxes()
         self._sync_visualization()
@@ -1098,15 +1115,25 @@ class AutonomousWarehouseApp:
 
     def _on_endpoint_changed(self, event=None) -> None:
         """Handle endpoint change."""
+        had_result = self._invalidate_search_result()
         src = self._get_selected_source()
         if src:
             self.inspect_node(src)
         self._sync_visualization()
+        if had_result:
+            self.update_status("Locations changed. Find a new route when ready.", "info")
 
     def _on_algorithm_changed(self) -> None:
         """Handle algorithm change."""
-        if self.current_result:
-            self.update_status(f"Algorithm set to {self.algo_var.get()}. Press 'Run Navigation' to recompute.", "info")
+        if self._invalidate_search_result():
+            self.update_status(f"Algorithm changed to {self.algo_var.get()}. Find a new route when ready.", "info")
+
+    def _invalidate_search_result(self) -> bool:
+        """Remove a stale route after an input or corridor has changed."""
+        had_result = self.current_result is not None or self.is_animating
+        if had_result:
+            self.clear_results(status_message=None)
+        return had_result
 
     def _sync_visualization(self) -> None:
         """Redraw canvas with current source, dest, and result."""
@@ -1170,6 +1197,7 @@ class AutonomousWarehouseApp:
         self.current_result = result
         self.display_results(result)
         self._sync_visualization()
+        self.btn_animate.config(state="normal" if result.found else "disabled")
 
         if result.found:
             self.update_status(
@@ -1238,26 +1266,12 @@ class AutonomousWarehouseApp:
     # ANIMATION CONTROLLER
     # =========================================================================
     def start_animation(self) -> None:
-        """Begin educational step-by-step search animation with queue/stack tracing."""
-        self._cancel_animation_if_running()
-        src, dst = self.validate_inputs()
-        if not src or not dst:
+        """Play the already calculated search as an educational walkthrough."""
+        if not self.current_result or not self.current_result.found:
+            self.update_status("Find a route before playing the search animation.", "warning")
             return
 
-        algo = self.algo_var.get()
-        blocked = set(self.warehouse.get_blocked_edges())
-
-        try:
-            if algo == "BFS":
-                result = bfs_search(self.warehouse.graph, src, dst, blocked_edges=blocked)
-            else:
-                result = dfs_search(self.warehouse.graph, src, dst, blocked_edges=blocked)
-        except Exception as ex:
-            messagebox.showerror("Search Error", str(ex))
-            return
-
-        self.current_result = result
-        self.display_results(result)
+        result = self.current_result
 
         self.is_animating = True
         self.animation_paused = False
@@ -1266,11 +1280,11 @@ class AutonomousWarehouseApp:
         self.animated_visited_nodes = []
         self.animated_path_nodes = []
 
-        self.btn_animate.config(text="⏹ Stop", command=self.stop_animation)
+        self.btn_animate.config(text="⏹ Stop Playback", command=self.stop_animation)
         self.btn_pause.config(state="normal", text="⏸ Pause")
         self.btn_run.config(state="disabled")
 
-        self.update_status(f"Starting {algo} animation...", "busy")
+        self.update_status(f"Playing {result.algorithm_name} search...", "busy")
         self._schedule_next_frame()
 
     def toggle_pause_animation(self) -> None:
@@ -1308,7 +1322,8 @@ class AutonomousWarehouseApp:
 
         self.is_animating = False
         self.animation_paused = False
-        self.btn_animate.config(text="▶ Start Animation", command=self.start_animation)
+        animate_state = "normal" if self.current_result and self.current_result.found else "disabled"
+        self.btn_animate.config(text="▶ Play Search", command=self.start_animation, state=animate_state)
         self.btn_pause.config(state="disabled", text="⏸ Pause")
         self.btn_run.config(state="normal")
 
@@ -1401,10 +1416,11 @@ class AutonomousWarehouseApp:
                 )
                 self._cancel_animation_if_running()
 
-    def clear_results(self) -> None:
+    def clear_results(self, status_message: Optional[str] = "Search cleared.") -> None:
         """Clear search results and reset view."""
         self._cancel_animation_if_running()
         self.current_result = None
+        self.btn_animate.config(state="disabled")
 
         self.route_badge.config(text="No Search Run Yet", bg=self.palette["badge"], fg=self.palette["text"])
         self.path_text.config(state="normal")
@@ -1423,7 +1439,8 @@ class AutonomousWarehouseApp:
             self.visited_tree.delete(item)
 
         self._sync_visualization()
-        self.update_status("Results cleared.", "info")
+        if status_message:
+            self.update_status(status_message, "info")
 
     def load_sample_warehouse(self) -> None:
         """Restore baseline starter map."""
