@@ -85,7 +85,7 @@ If the active route is blocked, run the search again. The application recalculat
 Requirements: Python 3.10 or newer. Python 3.11+ is recommended.
 
 ```bash
-git clone https://github.com/rohanv2007/autonomous-warehouse-robot.git
+git clone https://github.com/Pugazh-2006/autonomous-warehouse-robot.git
 cd autonomous-warehouse-robot
 python -m venv venv
 ```
