@@ -1008,8 +1008,9 @@ class AutonomousWarehouseApp:
         self.insp_degree_lbl.config(text=f"Aisles ({len(neighbors)}): {', '.join(neighbors)}")
 
     def _on_reset_view(self) -> None:
-        """Reset canvas zoom to fit."""
+        """Reset canvas zoom to fit while preserving the active search colors."""
         self.visualizer.reset_view()
+        self._sync_visualization()
 
     def _on_zoom_changed(self, zoom_factor: float) -> None:
         """Keep the toolbar honest about the current viewport and limits."""

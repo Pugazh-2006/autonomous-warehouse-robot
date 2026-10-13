@@ -67,6 +67,10 @@ class WarehouseVisualizer:
         # Setup Matplotlib Figure
         self.fig = Figure(figsize=(6.8, 5.2), dpi=100, facecolor=self.COLOR_BG)
         self.ax = self.fig.add_subplot(111)
+        # Let the fitted-map boundary use almost the whole canvas. The default
+        # Matplotlib subplot margins made the safe area look detached from the
+        # rest of the workspace.
+        self.fig.subplots_adjust(left=0.035, right=0.965, bottom=0.035, top=0.965)
         self.ax.set_facecolor(self.COLOR_BG)
 
         # Zoom & Pan State
